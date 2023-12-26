@@ -1,4 +1,4 @@
 streamlit
 cohere
-oracledb
+./oracledb-2.0.0.dev20231121-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
 array
