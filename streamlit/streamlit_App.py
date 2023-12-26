@@ -4,6 +4,8 @@ import cohere
 import array
 from typing import List
 
+
+pip install ./oracledb-2.0.0.dev20231121-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
 st.set_page_config(page_title="Chat with the Cohere and Oracle vector DB , demo powered by LB", page_icon="🦙", layout="centered", initial_sidebar_state="auto", menu_items=None)
 openai.api_key = st.secrets["openai_key"]
 st.title("Chat with the Cohere and Oracle vector DB , demo powered by LB 💬")
