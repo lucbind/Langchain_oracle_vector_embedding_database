@@ -3,21 +3,18 @@ import oracledb
 import cohere
 import array
 from typing import List
+import os
 
 
-st.set_page_config(page_title="Chat with the Cohere and Oracle vector DB , demo powered by LB", page_icon="🦙", layout="centered", initial_sidebar_state="auto", menu_items=None)
-openai.api_key = st.secrets["openai_key"]
-st.title("Chat with the Cohere and Oracle vector DB , demo powered by LB 💬")
-st.info("find all stuff in github repository [blog post](https://github.com/lucbind?tab=repositories)", icon="📃")
-         
-if "messages" not in st.session_state.keys(): # Initialize the chat messages history
-    st.session_state.messages = [
-        {"role": "assistant", "content": "Ask me a question about CV that are in the vector Oracle Database"}
-    ]
 
-@st.cache_resource(show_spinner=False)
 
 ###-----------------
+cohere_api_key =st.secrets["COHERE_API_KEY"] #keep your cohere api key  port  in the .env file and retrieve it
+oracle_service_name =st.secrets["SERVICE_NAME"] #keep your oracle listner port  in the .env file and retrieve it
+oracle_user = st.secrets ["USERNAME"] #keep your oracle username in the .env file and retrieve it
+oracle_password =st.secrets["PASSWORD"] #keep your oracle usernamepassword in the .env file and retrieve it
+oracle_hostname =st.secrets["HOST"] #keep your oracle server hostname in the .env file and retrieve it
+oracle_port =st.secrets["PORT"] #keep your oracle listner port  in the .env file and retrieve it
 
 co = cohere.Client(cohere_api_key)
 
@@ -32,14 +29,13 @@ connection = oracledb.connect(
 cursor = connection.cursor()
 
 
-def embed (prompt);
-    try :
-        embedding  = co.embed(
-            texts=[prompt],
-             model='embed-english-v3.0',
-             input_type='search_query'
-            )
-    return response
+def embed (prompt):
+    embedding  = co.embed(
+        texts=[prompt],
+         model='embed-english-v3.0',
+         input_type='search_query'
+        )
+    return embedding
 
 def generate_text(prompt, temp=0):
   response = co.generate(
@@ -49,52 +45,76 @@ def generate_text(prompt, temp=0):
     temperature=temp)
   return response.generations[0].text
 
-###-----------------
+import array
+from typing import List
 
+#funzione Ricerca all'intenro del database oracle sfruttando l'operatore VECTOR_DISTANCE
 
-
-if "chat_engine" not in st.session_state.keys(): # Initialize the chat engine
-        st.session_state.chat_engine = index.as_chat_engine(chat_mode="condense_question", verbose=True)
-
-if prompt := st.chat_input("Your question"): # Prompt for user input and save to chat history
-    st.session_state.messages.append({"role": "user", "content": prompt})
-
-for message in st.session_state.messages: # Display the prior chat messages
-    with st.chat_message(message["role"]):
-        st.write(message["content"])
-
-# If last message is not from assistant, generate a new response
-if st.session_state.messages[-1]["role"] != "assistant":
-    with st.chat_message("assistant"):
-        with st.spinner("Thinking..."):
-            response = embed(prompt);
-            #Ricerca all'intenro del database oracle sfruttando l'operatore VECTOR_DISTANCE
-            vector_prompt:List[float]=response.embeddings[0]
-            cursor = connection.cursor()
-            sql = """SELECT CHUNK  from Vector_CV_PDF where (ID_PDF, id_chunk) in 
-            (
-            select ID_PDF ,substr(ranking,instr(ranking,'-',-1)+1)chunk_id from (
-            select ID_PDF , min(ranking) ranking
-              from (
-                    select ID_PDF,VECTOR_DISTANCE(V,:1)||'--'||id_chunk ranking 
-                      from Vector_CV_PDF  
-                    order by VECTOR_DISTANCE(V,:2)
-                    )
-            group by id_pdf order by 2,1 desc FETCH FIRST 3 ROWS ONLY
+def find_oracle_chunk (vector_prompt:List[float],question_input ):
+    cursor = connection.cursor()
+    sql = """SELECT CHUNK  from Vector_CV_PDF where (ID_PDF, id_chunk) in 
+    (
+    select ID_PDF ,substr(ranking,instr(ranking,'-',-1)+1)chunk_id from (
+    select ID_PDF , min(ranking) ranking
+      from (
+            select ID_PDF,VECTOR_DISTANCE(V,:1)||'--'||id_chunk ranking 
+              from Vector_CV_PDF  
+            order by VECTOR_DISTANCE(V,:2)
             )
-            )"""
+    group by id_pdf order by 2,1 desc FETCH FIRST 3 ROWS ONLY
+    )
+    )"""
 
-            with connection.cursor() as cursor:
-                    array_query1 = array.array("d", vector_prompt)
-                    array_query2 = array.array("d", vector_prompt)
-                    cursor.execute(sql,[array_query1,array_query1])
-                    rows = cursor.fetchall()
-            #print(rows)
-text_prompt ='Kindly answer the following question  ' + prompt_question  + ' based on  ' ;
-for i in range(len(rows)):
-    text_prompt += rows[i][0]+' and  '
-response = generate_text(text_prompt, temp=0.5)
-print(response)
-st.write(response)
-message = {"role": "assistant", "content": response}
-st.session_state.messages.append(message) # Add response to message history
+    with connection.cursor() as cursor:
+            array_query1 = array.array("d", vector_prompt)
+            array_query2 = array.array("d", vector_prompt)
+            cursor.execute(sql,[array_query1,array_query1])
+            rows = cursor.fetchall()
+    #print(rows)
+
+    text_prompt ='Kindly answer the following question'+question_input+' based on '  
+    for i in range(len(rows)):
+        text_prompt += rows[i][0]+' and  '
+    return text_prompt
+
+# Applicare uno stile wide mode
+st.set_page_config(layout="wide")
+# Applicare uno stile con sfondo nero e testo bianco
+st.markdown(
+    """
+    <style>
+        body {
+            color: white;
+            background-color: black;
+        }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+
+
+
+     
+st.title("Chat with Cohere and Oracle Vector Database  💬🅾️")
+st.info("Check out the full tutorial to build this app in our [blog post](https://blog.streamlit.io/build-a-chatbot-with-custom-data-sources-powered-by-llamaindex/)", icon="📃")
+
+with st.chat_message("assistant"):
+     st.write("hello human 👋")
+
+
+
+question_input = st.chat_input("Your question", key = "question_input")
+if question_input:
+    with st.chat_message("user"):
+       st.write(f"{question_input}")
+       with st.spinner("Thinking..."):
+          response  = embed(question_input)
+          text_prompt=find_oracle_chunk(response.embeddings[0],question_input)
+          response = generate_text(text_prompt, temp=0.5)
+    with st.chat_message("assistant"):
+       st.write(response)
+
+
+
+
